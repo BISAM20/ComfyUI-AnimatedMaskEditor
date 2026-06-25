@@ -1,0 +1,2440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Animated Mask Drawer - Rotoscoping v2.0</title>
+    <style>
+        :root {
+            --bg-0: #0d0e12;
+            --bg-1: #14161d;
+            --bg-2: #1b1e26;
+            --bg-3: #232733;
+            --border: #2b2f3a;
+            --border-light: #3a4150;
+            --text: #e7e9ee;
+            --text-muted: #8b92a1;
+            --text-dim: #5c6373;
+            --accent: #5b9dff;
+            --accent-2: #4a7fe0;
+            --accent-glow: rgba(91, 157, 255, 0.35);
+            --danger: #ff5c5c;
+            --success: #3ddc84;
+            --warn: #ffae42;
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-0);
+            color: var(--text);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-light);
+            border-radius: 6px;
+            border: 2px solid var(--bg-1);
+        }
+        ::-webkit-scrollbar-thumb:hover { background: #4a5263; }
+
+        .container {
+            display: grid;
+            grid-template-columns: 272px 1fr 320px;
+            height: 100vh;
+        }
+
+        .sidebar {
+            background: var(--bg-1);
+            padding: 18px;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+        }
+
+        .canvas-area {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-0);
+        }
+
+        .timeline {
+            background: var(--bg-1);
+            padding: 18px;
+            border-left: 1px solid var(--border);
+            overflow-y: auto;
+        }
+
+        h2 {
+            font-size: 11px;
+            letter-spacing: 0.09em;
+            margin-bottom: 12px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            font-weight: 700;
+        }
+
+        .tool-btn {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            font-weight: 500;
+            text-align: left;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .tool-btn:hover { background: var(--bg-3); border-color: var(--border-light); }
+        .tool-btn.active {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            border-color: var(--accent);
+            color: #fff;
+            box-shadow: 0 0 0 1px var(--accent-glow), 0 4px 14px var(--accent-glow);
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: radial-gradient(circle at 50% 38%, #181b23 0%, #0a0b0e 100%);
+        }
+
+        .canvas-container {
+            position: relative;
+            transform-origin: 0 0;
+            transition: none;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), var(--shadow);
+        }
+
+        #videoCanvas, #maskCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: block;
+        }
+
+        .zoom-controls {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .zoom-btn {
+            background: rgba(27, 30, 38, 0.82);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 38px;
+            height: 38px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+
+        .zoom-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+        .zoom-display {
+            background: rgba(27, 30, 38, 0.82);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 5px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .controls {
+            background: var(--bg-1);
+            padding: 14px 18px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        label {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        label span { color: var(--text); font-variant-numeric: tabular-nums; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 5px;
+            background: var(--bg-3);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 2px solid #fff;
+            box-shadow: 0 0 8px var(--accent-glow);
+            transition: transform 0.1s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.18); }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: 2px solid #fff;
+            cursor: pointer;
+        }
+
+        input[type="number"], input[type="text"], select {
+            width: 100%;
+            padding: 8px 10px;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent-glow);
+        }
+
+        .shape-list {
+            margin-top: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .shape-item {
+            background: var(--bg-2);
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .shape-item:hover { background: var(--bg-3); border-color: var(--border-light); }
+        .shape-item.selected {
+            border-color: var(--accent);
+            background: rgba(91, 157, 255, 0.08);
+            box-shadow: inset 0 0 0 1px var(--accent-glow);
+        }
+
+        .shape-name-input {
+            background: var(--bg-1) !important;
+            border: 1px solid var(--border) !important;
+            color: var(--text) !important;
+            font-size: 12px !important;
+            padding: 5px 7px !important;
+            border-radius: 5px !important;
+            width: 100% !important;
+        }
+        .shape-name-input:focus { border-color: var(--accent) !important; outline: none; }
+
+        .delete-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            padding: 4px 9px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1;
+            flex-shrink: 0;
+            transition: background 0.15s, color 0.15s;
+        }
+        .delete-btn:hover { background: rgba(255, 92, 92, 0.15); color: var(--danger); }
+
+        .layer-btn {
+            background: var(--bg-3);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            flex-shrink: 0;
+            transition: background 0.15s, border-color 0.15s, color 0.15s;
+        }
+        .layer-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .layer-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+        .keyframe-track {
+            background: var(--bg-2);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+        }
+
+        .keyframe-bar {
+            height: 30px;
+            background: var(--bg-0);
+            position: relative;
+            border-radius: 5px;
+            margin-top: 8px;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+
+        .keyframe-marker {
+            position: absolute;
+            width: 7px;
+            height: 100%;
+            cursor: pointer;
+            border-radius: 2px;
+            z-index: 2;
+            transform: translateX(-50%);
+            box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+            transition: filter 0.1s;
+        }
+
+        .keyframe-marker:hover { filter: brightness(1.35); }
+        .keyframe-marker.opacity-only { background: var(--warn) !important; }
+
+        .import-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .import-modal.active { display: flex; }
+
+        .import-modal-content {
+            background: var(--bg-1);
+            border: 1px solid var(--border);
+            padding: 28px;
+            border-radius: var(--radius);
+            max-width: 600px;
+            width: 90%;
+            box-shadow: var(--shadow);
+        }
+
+        .import-textarea {
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg-0);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 12px;
+            font-family: 'SF Mono', 'Cascadia Code', monospace;
+            font-size: 12px;
+            border-radius: var(--radius-sm);
+        }
+
+        .playhead {
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background: var(--danger);
+            pointer-events: none;
+            z-index: 3;
+            box-shadow: 0 0 6px rgba(255, 92, 92, 0.7);
+        }
+
+        .play-btn {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            border: none;
+            color: #fff;
+            padding: 9px 18px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: filter 0.15s, box-shadow 0.15s;
+        }
+        .play-btn:hover { filter: brightness(1.1); box-shadow: 0 4px 14px var(--accent-glow); }
+
+        .frame-display {
+            color: var(--text-muted);
+            font-size: 13px;
+            font-variant-numeric: tabular-nums;
+        }
+        .frame-display span { color: var(--text); }
+
+        .save-btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--success), #2bbf6e);
+            color: #04130a;
+            padding: 13px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 700;
+            margin-top: 16px;
+            font-size: 14px;
+            transition: filter 0.15s, box-shadow 0.15s;
+        }
+        .save-btn:hover { filter: brightness(1.08); box-shadow: 0 4px 18px rgba(61, 220, 132, 0.3); }
+
+        .status {
+            margin-top: 12px;
+            padding: 10px;
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            text-align: center;
+            display: none;
+        }
+        .status.success {
+            background: rgba(61, 220, 132, 0.12);
+            border-color: rgba(61, 220, 132, 0.4);
+            color: var(--success);
+            display: block;
+        }
+        .status.error {
+            background: rgba(255, 92, 92, 0.12);
+            border-color: rgba(255, 92, 92, 0.4);
+            color: var(--danger);
+            display: block;
+        }
+
+        .auto-keyframe-indicator {
+            background: rgba(255, 92, 92, 0.12);
+            border: 1px solid rgba(255, 92, 92, 0.3);
+            color: #ff8a8a;
+            padding: 8px 11px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 14px;
+        }
+        .auto-keyframe-indicator::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 7px var(--danger);
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 15px;
+            color: var(--text-dim);
+            z-index: 10;
+        }
+
+        .video-info {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            padding: 10px;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            margin-bottom: 16px;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Sidebar - Tools -->
+        <div class="sidebar">
+            <h2>Tools</h2>
+            <button class="tool-btn active" data-tool="select">Select/Move</button>
+            <button class="tool-btn" data-tool="circle">Circle</button>
+            <button class="tool-btn" data-tool="rectangle">Rectangle</button>
+            <button class="tool-btn" data-tool="bezier">Bezier Path</button>
+            
+            <div class="auto-keyframe-indicator">
+                Auto-Keyframe Active
+            </div>
+
+            <button class="tool-btn active" onclick="toggleOutlines()" id="toggleOutlinesBtn" style="margin-top: 10px;">
+                👁️ Hide Outlines
+            </button>
+
+            <h2 style="margin-top: 20px;">Video Info</h2>
+            <div class="video-info" id="videoInfo">
+                Loading video...
+            </div>
+            
+            <div style="font-size: 11px; color: #666; margin-bottom: 15px; line-height: 1.4;">
+                🖱️ <strong>Navigation:</strong><br>
+                • Scroll wheel: Zoom in/out<br>
+                • Middle-click + drag: Pan<br>
+                • ← → : Change frames<br>
+                <br>
+                ✨ <strong>Selection:</strong><br>
+                • Click: Select shape<br>
+                • Shift+Click: Add to selection<br>
+                • Drag box: Multi-select<br>
+                • Ctrl+Z: Undo<br>
+                <br>
+                🎨 <strong>Bezier Tool:</strong><br>
+                • Click to add points<br>
+                • Enter: Finish shape<br>
+                • Esc: Cancel<br>
+                <br>
+                💡 <strong>Animation:</strong><br>
+                • Move shapes to create keyframes<br>
+                • Rotation included automatically!<br>
+                • Smooth interpolation between frames
+            </div>
+            
+            <h2>Properties</h2>
+            <div class="control-group">
+                <label>Size: <span id="sizeValue">50</span></label>
+                <input type="range" id="size" min="10" max="200" value="50">
+            </div>
+            
+            <div class="control-group">
+                <label>Opacity: <span id="opacityValue">100</span>%</label>
+                <input type="range" id="opacity" min="0" max="100" value="100">
+                <button class="tool-btn" onclick="addOpacityKeyframe()" style="margin-top: 5px; padding: 8px; font-size: 13px; background: #4a9eff;">
+                    🔑 Keyframe Opacity
+                </button>
+            </div>
+            
+            <div class="control-group">
+                <label>Rotation: <span id="rotationValue">0</span>°</label>
+                <input type="range" id="rotation" min="-180" max="180" value="0">
+                <button class="tool-btn" onclick="addRotationKeyframe()" style="margin-top: 5px; padding: 8px; font-size: 13px; background: #4a9eff;">
+                    🔑 Keyframe Rotation
+                </button>
+            </div>
+            
+            <div class="control-group">
+                <label>Stencil Mode</label>
+                <select id="stencilMode">
+                    <option value="add">Add (Normal)</option>
+                    <option value="subtract">Subtract</option>
+                    <option value="intersect">Intersect</option>
+                    <option value="difference">Difference</option>
+                </select>
+            </div>
+            
+            <h2 style="margin-top: 20px;">Shapes</h2>
+            <div class="shape-list" id="shapeList"></div>
+        </div>
+        
+        <!-- Center - Canvas -->
+        <div class="canvas-area">
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <div class="loading" id="loading">Loading video frames...</div>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomIn()" title="Zoom In">+</button>
+                    <div class="zoom-display" id="zoomDisplay">100%</div>
+                    <button class="zoom-btn" onclick="zoomOut()" title="Zoom Out">−</button>
+                    <button class="zoom-btn" onclick="resetZoom()" title="Fit & Center">⊙</button>
+                </div>
+                <div class="canvas-container" id="canvasContainer">
+                    <canvas id="videoCanvas"></canvas>
+                    <canvas id="maskCanvas"></canvas>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="play-btn" onclick="togglePlayback()">▶ Play</button>
+                <span class="frame-display">Frame: <span id="currentFrame">0</span> / <span id="totalFrames">0</span></span>
+                <input type="range" id="frameSlider" min="0" max="100" value="0" style="flex: 1;">
+            </div>
+        </div>
+        
+        <!-- Right Sidebar - Timeline -->
+        <div class="timeline">
+            <h2>Timeline & Keyframes</h2>
+            
+            <div style="font-size: 11px; color: #888; margin-bottom: 10px; line-height: 1.5;">
+                <div style="margin-bottom: 5px;">
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #4a9eff; border-radius: 2px; vertical-align: middle;"></span>
+                    <span style="margin-left: 5px;">Position/Size/Rotation</span>
+                </div>
+                <div>
+                    <span style="display: inline-block; width: 12px; height: 12px; background: #ff9944; border-radius: 2px; vertical-align: middle;"></span>
+                    <span style="margin-left: 5px;">Opacity Only</span>
+                </div>
+            </div>
+            
+            <p style="font-size: 12px; color: #888; margin-bottom: 15px;">
+                Move shapes at different frames to create keyframes automatically!
+            </p>
+            
+            <div id="keyframeTracks"></div>
+            
+            <button class="save-btn" onclick="saveToComfyUI()">💾 Save & Return to ComfyUI</button>
+            <div id="status" class="status"></div>
+        </div>
+    </div>
+    
+    <!-- Import Modal -->
+    <div class="import-modal" id="importModal">
+        <div class="import-modal-content">
+            <h2 style="margin-bottom: 15px;">Import from Nuke Roto</h2>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px;">
+                Paste Nuke roto node data (Python format). Select the roto node in Nuke and copy, or use the Python snippet.
+            </p>
+            <textarea class="import-textarea" id="importTextarea" placeholder="Paste Nuke roto data here...&#10;&#10;Example Python format:&#10;{&#10;  'curves': [{&#10;    'name': 'Bezier1',&#10;    'points': [...],&#10;    'lifetime': [0, 100]&#10;  }]&#10;}"></textarea>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="tool-btn" style="flex: 1; background: #44ff44; color: #000;" onclick="processNukeImport()">
+                    ✓ Import
+                </button>
+                <button class="tool-btn" style="flex: 1; background: #ff4444;" onclick="closeImportDialog()">
+                    ✗ Cancel
+                </button>
+            </div>
+            <div id="importStatus" style="margin-top: 10px; color: #ff4444; font-size: 12px;"></div>
+        </div>
+    </div>
+
+    <script>
+        console.log("=== MASK EDITOR V2.0 LOADED ===");
+
+        // Identify which Roto node opened this editor so all state is per-node.
+        const nodeId = new URLSearchParams(location.search).get('node');
+        const nodeQuery = nodeId !== null ? `?node=${encodeURIComponent(nodeId)}` : '';
+        const nodeParam = nodeId !== null ? `&node=${encodeURIComponent(nodeId)}` : '';
+
+        // State
+        let videoCanvas, videoCtx, maskCanvas, maskCtx;
+        let shapes = [];
+        let selectedShape = null;
+        let selectedShapes = []; // Multi-select support
+        let selectedHandle = null;
+        let currentTool = 'select';
+        let currentFrame = 0;
+        let totalFrames = 100;
+        let isPlaying = false;
+        let isDragging = false;
+        let isDraggingHandle = false;
+        let dragStart = null;
+        let hasUnsavedChanges = false;
+        let videoFrameCache = {};
+        let videoWidth = 0;
+        let videoHeight = 0;
+        
+        // Undo system
+        let undoHistory = [];
+        let undoIndex = -1;
+        const MAX_UNDO_HISTORY = 50;
+        
+        // Bezier drawing state
+        let bezierPoints = [];
+        let isDrawingBezier = false;
+        
+        // Box selection state
+        let isBoxSelecting = false;
+        let boxSelectStart = null;
+        
+        // Pan and Zoom state
+        let scale = 1.0;
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        
+        // Outline visibility toggle
+        let showOutlines = true;
+        
+        // Initialize
+        window.onload = async () => {
+            videoCanvas = document.getElementById('videoCanvas');
+            videoCtx = videoCanvas.getContext('2d');
+            maskCanvas = document.getElementById('maskCanvas');
+            maskCtx = maskCanvas.getContext('2d');
+            
+            await loadVideoInfo();
+            setCanvasSize();
+            await loadFromComfyUI();
+            await loadVideoFrame(0);
+            
+            // Tool selection
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tool-btn[data-tool]').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                    currentTool = e.target.dataset.tool;
+                    
+                    if (isDrawingBezier && currentTool !== 'bezier') {
+                        finishBezier();
+                    }
+                });
+            });
+            
+            // Canvas events
+            maskCanvas.addEventListener('mousedown', onMouseDown);
+            maskCanvas.addEventListener('mousemove', onMouseMove);
+            maskCanvas.addEventListener('mouseup', onMouseUp);
+            maskCanvas.addEventListener('mouseleave', onMouseUp);
+            
+            // Pan and zoom events
+            const wrapper = document.getElementById('canvasWrapper');
+            wrapper.addEventListener('wheel', onWheel, { passive: false });
+            wrapper.addEventListener('mousedown', onWrapperMouseDown);
+            wrapper.addEventListener('mousemove', onWrapperMouseMove);
+            wrapper.addEventListener('mouseup', onWrapperMouseUp);
+            wrapper.addEventListener('mouseleave', onWrapperMouseUp);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Undo with Ctrl+Z or Cmd+Z
+                if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                    e.preventDefault();
+                    undo();
+                    return;
+                }
+                
+                if (e.key === 'ArrowRight') {
+                    e.preventDefault();
+                    if (currentFrame < totalFrames - 1) {
+                        currentFrame++;
+                        document.getElementById('currentFrame').textContent = currentFrame;
+                        document.getElementById('frameSlider').value = currentFrame;
+                        loadVideoFrame(currentFrame);
+                        render();
+                        updateKeyframeTracks();
+                    }
+                } else if (e.key === 'ArrowLeft') {
+                    e.preventDefault();
+                    if (currentFrame > 0) {
+                        currentFrame--;
+                        document.getElementById('currentFrame').textContent = currentFrame;
+                        document.getElementById('frameSlider').value = currentFrame;
+                        loadVideoFrame(currentFrame);
+                        render();
+                        updateKeyframeTracks();
+                    }
+                } else if (e.key === 'Escape' && isDrawingBezier) {
+                    bezierPoints = [];
+                    isDrawingBezier = false;
+                    render();
+                } else if (e.key === 'Enter' && isDrawingBezier) {
+                    finishBezier();
+                } else if ((e.key === 'Delete' || e.key === 'Backspace')) {
+                    e.preventDefault();
+                    
+                    if (selectedHandle && selectedHandle.name === 'point' && selectedShape && selectedShape.type === 'bezier') {
+                        deleteBezierPoint(selectedShape, selectedHandle.index);
+                    } else if (selectedShape) {
+                        const confirmDelete = confirm(`Delete ${selectedShape.name || selectedShape.type} shape?`);
+                        if (confirmDelete) {
+                            deleteShapeById(selectedShape.id);
+                        }
+                    }
+                }
+            });
+            
+            // Sliders
+            document.getElementById('size').addEventListener('input', (e) => {
+                document.getElementById('sizeValue').textContent = e.target.value;
+                if (selectedShape && selectedShape.type !== 'bezier') {
+                    const size = parseInt(e.target.value);
+                    updateShapeKeyframe(selectedShape, currentFrame, {
+                        radius: size,
+                        width: size * 2,
+                        height: size * 2
+                    });
+                    render();
+                    updateKeyframeTracks();
+                    hasUnsavedChanges = true;
+                }
+            });
+            
+            document.getElementById('opacity').addEventListener('input', (e) => {
+                document.getElementById('opacityValue').textContent = e.target.value;
+                // Apply opacity live to every selected shape (keyframes at current frame).
+                if (selectedShapes.length > 0) {
+                    const opacity = parseInt(e.target.value) / 100;
+                    selectedShapes.forEach(shape => {
+                        updateShapeKeyframe(shape, currentFrame, { opacity });
+                    });
+                    render();
+                    updateKeyframeTracks();
+                    hasUnsavedChanges = true;
+                }
+            });
+            
+            document.getElementById('rotation').addEventListener('input', (e) => {
+                document.getElementById('rotationValue').textContent = e.target.value;
+            });
+            
+            document.getElementById('stencilMode').addEventListener('change', (e) => {
+                if (selectedShape) {
+                    selectedShape.stencilMode = e.target.value;
+                    updateShapeList();
+                    render();
+                    hasUnsavedChanges = true;
+                }
+            });
+            
+            document.getElementById('frameSlider').addEventListener('input', async (e) => {
+                currentFrame = parseInt(e.target.value);
+                document.getElementById('currentFrame').textContent = currentFrame;
+                await loadVideoFrame(currentFrame);
+                render();
+                updateKeyframeTracks();
+            });
+            
+            centerView();
+            document.getElementById('loading').style.display = 'none';
+            render();
+        };
+        
+        async function loadVideoInfo() {
+            try {
+                const response = await fetch('/animated_mask_editor/video_info' + nodeQuery);
+                const info = await response.json();
+                
+                if (info.has_video) {
+                    totalFrames = info.total_frames;
+                    videoWidth = info.width;
+                    videoHeight = info.height;
+                    
+                    document.getElementById('totalFrames').textContent = totalFrames;
+                    document.getElementById('frameSlider').max = totalFrames - 1;
+                    
+                    document.getElementById('videoInfo').innerHTML = `
+                        ✓ ${totalFrames} frames<br>
+                        📐 ${videoWidth} x ${videoHeight}
+                    `;
+                    document.getElementById('videoInfo').style.background = '#2d5f2d';
+                    
+                    setCanvasSize();
+                } else {
+                    document.getElementById('videoInfo').innerHTML = `
+                        ⚠️ No video loaded<br>
+                        <span style="font-size: 10px;">${info.error || 'Queue workflow first!'}</span>
+                    `;
+                    document.getElementById('videoInfo').style.background = '#5f2d2d';
+                }
+            } catch (error) {
+                console.error('Failed to load video info:', error);
+            }
+        }
+        
+        function setCanvasSize() {
+            if (videoWidth > 0 && videoHeight > 0) {
+                videoCanvas.width = videoWidth;
+                videoCanvas.height = videoHeight;
+                maskCanvas.width = videoWidth;
+                maskCanvas.height = videoHeight;
+                console.log(`Canvas set to: ${videoWidth}x${videoHeight}`);
+            }
+        }
+        
+        async function loadVideoFrame(frame) {
+            if (videoFrameCache[frame]) {
+                const img = videoFrameCache[frame];
+                videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+                videoCtx.drawImage(img, 0, 0, videoWidth, videoHeight);
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/animated_mask_editor/video_frame?frame=${frame}${nodeParam}`);
+                const data = await response.json();
+                
+                if (data.image) {
+                    const img = new Image();
+                    img.onload = () => {
+                        videoFrameCache[frame] = img;
+                        videoCtx.clearRect(0, 0, videoCanvas.width, videoCanvas.height);
+                        videoCtx.drawImage(img, 0, 0, videoWidth, videoHeight);
+                    };
+                    img.src = data.image;
+                }
+            } catch (error) {
+                console.error('Failed to load frame:', error);
+            }
+        }
+        
+        function centerView() {
+            const wrapper = document.getElementById('canvasWrapper');
+            if (!wrapper || videoWidth === 0 || videoHeight === 0) return;
+            
+            const wrapperWidth = wrapper.clientWidth;
+            const wrapperHeight = wrapper.clientHeight;
+            
+            // Calculate scale to fit entire image (remove 1.0 limit)
+            const scaleX = wrapperWidth / videoWidth;
+            const scaleY = wrapperHeight / videoHeight;
+            scale = Math.min(scaleX, scaleY) * 0.95; // 0.95 for some padding
+            
+            // Center the image
+            panX = (wrapperWidth - videoWidth * scale) / 2;
+            panY = (wrapperHeight - videoHeight * scale) / 2;
+            
+            updateTransform();
+        }
+        
+        function updateTransform() {
+            const container = document.getElementById('canvasContainer');
+            container.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+            document.getElementById('zoomDisplay').textContent = Math.round(scale * 100) + '%';
+        }
+        
+        function onWheel(e) {
+            e.preventDefault();
+            const wrapper = document.getElementById('canvasWrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            const canvasX = (mouseX - panX) / scale;
+            const canvasY = (mouseY - panY) / scale;
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.max(0.1, Math.min(10, scale * delta));
+            panX = mouseX - canvasX * newScale;
+            panY = mouseY - canvasY * newScale;
+            scale = newScale;
+            updateTransform();
+        }
+        
+        function onWrapperMouseDown(e) {
+            if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
+                e.preventDefault();
+                isPanning = true;
+                panStartX = e.clientX - panX;
+                panStartY = e.clientY - panY;
+                document.getElementById('canvasWrapper').style.cursor = 'grabbing';
+            }
+        }
+        
+        function onWrapperMouseMove(e) {
+            if (isPanning) {
+                panX = e.clientX - panStartX;
+                panY = e.clientY - panStartY;
+                updateTransform();
+            }
+        }
+        
+        function onWrapperMouseUp(e) {
+            if (isPanning) {
+                isPanning = false;
+                document.getElementById('canvasWrapper').style.cursor = 'default';
+            }
+        }
+        
+        function zoomIn() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const canvasX = (centerX - panX) / scale;
+            const canvasY = (centerY - panY) / scale;
+            const newScale = Math.min(10, scale * 1.2);
+            panX = centerX - canvasX * newScale;
+            panY = centerY - canvasY * newScale;
+            scale = newScale;
+            updateTransform();
+        }
+        
+        function zoomOut() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            const canvasX = (centerX - panX) / scale;
+            const canvasY = (centerY - panY) / scale;
+            const newScale = Math.max(0.1, scale * 0.8);
+            panX = centerX - canvasX * newScale;
+            panY = centerY - canvasY * newScale;
+            scale = newScale;
+            updateTransform();
+        }
+        
+        function resetZoom() {
+            centerView();
+        }
+        
+        function onMouseDown(e) {
+            if (isPanning) return;
+            
+            const rect = maskCanvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / scale;
+            const y = (e.clientY - rect.top) / scale;
+            
+            if (currentTool === 'select') {
+                // Check if clicking on a handle of the primary selected shape
+                if (selectedShape) {
+                    const handle = getHandleAtPosition(selectedShape, x, y);
+                    if (handle) {
+                        isDraggingHandle = true;
+                        selectedHandle = handle;
+                        dragStart = { x, y };
+                        return;
+                    }
+                }
+                
+                // Find clicked shape
+                const clickedShape = shapes.find(s => {
+                    const interpolated = interpolateShape(s, currentFrame);
+                    return isPointInShape(interpolated, x, y);
+                });
+                
+                if (clickedShape) {
+                    // Shift+click adds to selection
+                    if (e.shiftKey) {
+                        if (!selectedShapes.includes(clickedShape)) {
+                            selectedShapes.push(clickedShape);
+                        }
+                        selectedShape = clickedShape; // Make it primary
+                    } else {
+                        // Regular click - single select
+                        if (selectedShapes.length > 1 && selectedShapes.includes(clickedShape)) {
+                            // Already part of multi-select, keep multi-select
+                        } else {
+                            selectedShapes = [clickedShape];
+                            selectedShape = clickedShape;
+                        }
+                    }
+                    
+                    // Prepare for dragging all selected shapes
+                    isDragging = true;
+                    dragStart = { x, y, shapes: [] };
+                    
+                    // Store initial position for each selected shape
+                    selectedShapes.forEach(shape => {
+                        const interpolated = interpolateShape(shape, currentFrame);
+                        let anchorX = interpolated.x;
+                        let anchorY = interpolated.y;
+                        
+                        // For bezier, use actual mouse position relative to first point instead of centroid
+                        if (shape.type === 'bezier' && interpolated.points && interpolated.points.length > 0) {
+                            anchorX = interpolated.points[0].x;
+                            anchorY = interpolated.points[0].y;
+                        }
+                        
+                        dragStart.shapes.push({
+                            shape: shape,
+                            startX: anchorX,
+                            startY: anchorY,
+                            interpolated: interpolated
+                        });
+                    });
+                    
+                    updateShapeList();
+                } else {
+                    // Clicked on empty space
+                    if (!e.shiftKey) {
+                        selectedShape = null;
+                        selectedShapes = [];
+                    }
+                    isBoxSelecting = true;
+                    boxSelectStart = { x, y };
+                    updateShapeList();
+                }
+            } else if (currentTool === 'bezier') {
+                handleBezierClick(x, y);
+            } else {
+                const size = parseInt(document.getElementById('size').value);
+                const opacity = parseInt(document.getElementById('opacity').value) / 100;
+                const rotation = parseFloat(document.getElementById('rotation').value);
+                const stencilMode = document.getElementById('stencilMode').value;
+                
+                const shape = {
+                    id: Date.now(),
+                    type: currentTool,
+                    x, y,
+                    radius: size,
+                    width: size * 2,
+                    height: size * 2,
+                    opacity,
+                    rotation,
+                    stencilMode,
+                    keyframes: []
+                };
+                
+                addKeyframeForShape(shape, currentFrame);
+                shapes.push(shape);
+                selectedShape = shape;
+                selectedShapes = [shape];
+                saveState();
+                updateShapeList();
+                hasUnsavedChanges = true;
+            }
+            
+            render();
+        }
+        
+        function onMouseMove(e) {
+            if (isDragging && dragStart && dragStart.shapes) {
+                const rect = maskCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / scale;
+                const y = (e.clientY - rect.top) / scale;
+                
+                const dx = x - dragStart.x;
+                const dy = y - dragStart.y;
+                
+                // Move all selected shapes together
+                dragStart.shapes.forEach(({ shape, startX, startY, interpolated }) => {
+                    if (shape.type === 'bezier' && interpolated.points) {
+                        // For bezier, move all points by the delta
+                        const newPoints = interpolated.points.map(p => ({
+                            x: p.x + dx,
+                            y: p.y + dy
+                        }));
+                        updateShapeKeyframe(shape, currentFrame, {
+                            x: startX + dx,
+                            y: startY + dy,
+                            points: newPoints
+                        });
+                    } else {
+                        // For other shapes, just move the center
+                        updateShapeKeyframe(shape, currentFrame, {
+                            x: startX + dx,
+                            y: startY + dy
+                        });
+                    }
+                });
+                
+                render();
+                updateKeyframeTracks();
+                hasUnsavedChanges = true;
+            } else if (isDraggingHandle && selectedShape && selectedHandle) {
+                const rect = maskCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / scale;
+                const y = (e.clientY - rect.top) / scale;
+                
+                handleHandleDrag(x, y);
+                render();
+                updateKeyframeTracks();
+                hasUnsavedChanges = true;
+            } else if (isBoxSelecting) {
+                render();
+            }
+        }
+        
+        function onMouseUp(e) {
+            if (isBoxSelecting && boxSelectStart) {
+                const rect = maskCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left) / scale;
+                const y = (e.clientY - rect.top) / scale;
+                
+                const minX = Math.min(boxSelectStart.x, x);
+                const maxX = Math.max(boxSelectStart.x, x);
+                const minY = Math.min(boxSelectStart.y, y);
+                const maxY = Math.max(boxSelectStart.y, y);
+                
+                const boxWidth = maxX - minX;
+                const boxHeight = maxY - minY;
+                
+                if (boxWidth > 10 || boxHeight > 10) {
+                    // Select all shapes inside the box
+                    const shapesInBox = shapes.filter(s => {
+                        const interpolated = interpolateShape(s, currentFrame);
+                        if (s.type === 'circle' || s.type === 'rectangle') {
+                            return interpolated.x >= minX && interpolated.x <= maxX &&
+                                   interpolated.y >= minY && interpolated.y <= maxY;
+                        } else if (s.type === 'bezier' && interpolated.points) {
+                            return interpolated.points.some(pt => 
+                                pt.x >= minX && pt.x <= maxX &&
+                                pt.y >= minY && pt.y <= maxY
+                            );
+                        }
+                        return false;
+                    });
+                    
+                    if (shapesInBox.length > 0) {
+                        selectedShapes = shapesInBox;
+                        selectedShape = shapesInBox[0]; // Primary selection
+                        updateShapeList();
+                    }
+                }
+                
+                isBoxSelecting = false;
+                boxSelectStart = null;
+                render();
+            }
+            
+            isDragging = false;
+            isDraggingHandle = false;
+            selectedHandle = null;
+            
+            if (dragStart) {
+                saveState(); // Save state after drag completes
+            }
+            
+            dragStart = null;
+        }
+        
+        function handleHandleDrag(x, y) {
+            const interpolated = interpolateShape(selectedShape, currentFrame);
+            
+            if (selectedShape.type === 'rectangle') {
+                const centerX = interpolated.x;
+                const centerY = interpolated.y;
+                let newWidth = interpolated.width;
+                let newHeight = interpolated.height;
+                
+                if (selectedHandle.name === 'tl') {
+                    newWidth = 2 * Math.abs(centerX - x);
+                    newHeight = 2 * Math.abs(centerY - y);
+                } else if (selectedHandle.name === 'tr') {
+                    newWidth = 2 * Math.abs(x - centerX);
+                    newHeight = 2 * Math.abs(centerY - y);
+                } else if (selectedHandle.name === 'bl') {
+                    newWidth = 2 * Math.abs(centerX - x);
+                    newHeight = 2 * Math.abs(y - centerY);
+                } else if (selectedHandle.name === 'br') {
+                    newWidth = 2 * Math.abs(x - centerX);
+                    newHeight = 2 * Math.abs(y - centerY);
+                }
+                
+                updateShapeKeyframe(selectedShape, currentFrame, { width: newWidth, height: newHeight });
+            } else if (selectedShape.type === 'circle') {
+                const centerX = interpolated.x;
+                const centerY = interpolated.y;
+                const newRadius = Math.sqrt((x - centerX)**2 + (y - centerY)**2);
+                updateShapeKeyframe(selectedShape, currentFrame, { radius: newRadius });
+            } else if (selectedShape.type === 'bezier' && selectedHandle.name === 'point') {
+                const newPoints = [...interpolated.points];
+                newPoints[selectedHandle.index] = { x, y };
+                updateShapeKeyframe(selectedShape, currentFrame, { points: newPoints });
+            }
+        }
+        
+        function getHandleAtPosition(shape, x, y) {
+            const handleSize = 10 / scale;
+            const interpolated = interpolateShape(shape, currentFrame);
+            
+            if (shape.type === 'rectangle') {
+                const corners = [
+                    { name: 'tl', x: interpolated.x - interpolated.width/2, y: interpolated.y - interpolated.height/2 },
+                    { name: 'tr', x: interpolated.x + interpolated.width/2, y: interpolated.y - interpolated.height/2 },
+                    { name: 'bl', x: interpolated.x - interpolated.width/2, y: interpolated.y + interpolated.height/2 },
+                    { name: 'br', x: interpolated.x + interpolated.width/2, y: interpolated.y + interpolated.height/2 }
+                ];
+                
+                for (let corner of corners) {
+                    if (Math.sqrt((x - corner.x)**2 + (y - corner.y)**2) < handleSize) {
+                        return corner;
+                    }
+                }
+            } else if (shape.type === 'circle') {
+                const handles = [
+                    { name: 'n', x: interpolated.x, y: interpolated.y - interpolated.radius },
+                    { name: 's', x: interpolated.x, y: interpolated.y + interpolated.radius },
+                    { name: 'e', x: interpolated.x + interpolated.radius, y: interpolated.y },
+                    { name: 'w', x: interpolated.x - interpolated.radius, y: interpolated.y }
+                ];
+                
+                for (let handle of handles) {
+                    if (Math.sqrt((x - handle.x)**2 + (y - handle.y)**2) < handleSize) {
+                        return handle;
+                    }
+                }
+            } else if (shape.type === 'bezier' && interpolated.points) {
+                for (let i = interpolated.points.length - 1; i >= 0; i--) {
+                    const pt = interpolated.points[i];
+                    if (Math.sqrt((x - pt.x)**2 + (y - pt.y)**2) < handleSize) {
+                        return { name: 'point', index: i, x: pt.x, y: pt.y };
+                    }
+                }
+            }
+            
+            return null;
+        }
+        
+        function isPointInShape(shape, x, y) {
+            const dx = x - shape.x;
+            const dy = y - shape.y;
+            
+            if (shape.type === 'circle') {
+                return Math.sqrt(dx*dx + dy*dy) < shape.radius;
+            } else if (shape.type === 'rectangle') {
+                return Math.abs(dx) < shape.width/2 && Math.abs(dy) < shape.height/2;
+            } else if (shape.type === 'bezier' && shape.points && shape.points.length >= 3) {
+                let inside = false;
+                for (let i = 0, j = shape.points.length - 1; i < shape.points.length; j = i++) {
+                    const xi = shape.points[i].x, yi = shape.points[i].y;
+                    const xj = shape.points[j].x, yj = shape.points[j].y;
+                    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                    if (intersect) inside = !inside;
+                }
+                return inside;
+            }
+            return false;
+        }
+        
+        function handleBezierClick(x, y) {
+            if (!isDrawingBezier) {
+                isDrawingBezier = true;
+                bezierPoints = [{ x, y }];
+            } else {
+                bezierPoints.push({ x, y });
+            }
+            render();
+        }
+        
+        function finishBezier() {
+            if (bezierPoints.length < 3) {
+                bezierPoints = [];
+                isDrawingBezier = false;
+                return;
+            }
+            
+            const opacity = parseInt(document.getElementById('opacity').value) / 100;
+            const rotation = parseFloat(document.getElementById('rotation').value);
+            const stencilMode = document.getElementById('stencilMode').value;
+            const shape = {
+                id: Date.now(),
+                type: 'bezier',
+                points: bezierPoints.map(p => ({ x: p.x, y: p.y })),
+                x: bezierPoints[0].x,
+                y: bezierPoints[0].y,
+                opacity,
+                rotation,
+                stencilMode,
+                keyframes: []
+            };
+            
+            addKeyframeForShape(shape, currentFrame);
+            shapes.push(shape);
+            selectedShape = shape;
+            selectedShapes = [shape];
+            saveState();
+            
+            bezierPoints = [];
+            isDrawingBezier = false;
+            
+            updateShapeList();
+            hasUnsavedChanges = true;
+            render();
+        }
+        
+        function render() {
+            maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+            
+            shapes.forEach(shape => {
+                const interpolated = interpolateShape(shape, currentFrame);
+                const stencilMode = shape.stencilMode || 'add';
+                
+                maskCtx.globalAlpha = interpolated.opacity;
+                maskCtx.fillStyle = '#ffffff';
+                
+                if (stencilMode === 'subtract') {
+                    maskCtx.globalCompositeOperation = 'destination-out';
+                } else if (stencilMode === 'intersect') {
+                    maskCtx.globalCompositeOperation = 'destination-in';
+                } else if (stencilMode === 'difference') {
+                    maskCtx.globalCompositeOperation = 'xor';
+                } else {
+                    maskCtx.globalCompositeOperation = 'source-over';
+                }
+                
+                if (interpolated.type === 'circle') {
+                    maskCtx.save();
+                    maskCtx.translate(interpolated.x, interpolated.y);
+                    if (interpolated.rotation) {
+                        maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                    }
+                    maskCtx.beginPath();
+                    maskCtx.arc(0, 0, interpolated.radius, 0, Math.PI * 2);
+                    maskCtx.fill();
+                    maskCtx.restore();
+                } else if (interpolated.type === 'rectangle') {
+                    maskCtx.save();
+                    maskCtx.translate(interpolated.x, interpolated.y);
+                    if (interpolated.rotation) {
+                        maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                    }
+                    maskCtx.fillRect(
+                        -interpolated.width/2,
+                        -interpolated.height/2,
+                        interpolated.width,
+                        interpolated.height
+                    );
+                    maskCtx.restore();
+                } else if (interpolated.type === 'bezier' && interpolated.points && interpolated.points.length > 0) {
+                    // Calculate centroid for rotation
+                    const centroidX = interpolated.points.reduce((sum, p) => sum + p.x, 0) / interpolated.points.length;
+                    const centroidY = interpolated.points.reduce((sum, p) => sum + p.y, 0) / interpolated.points.length;
+                    
+                    maskCtx.save();
+                    maskCtx.translate(centroidX, centroidY);
+                    if (interpolated.rotation) {
+                        maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                    }
+                    maskCtx.translate(-centroidX, -centroidY);
+                    
+                    maskCtx.beginPath();
+                    maskCtx.moveTo(interpolated.points[0].x, interpolated.points[0].y);
+                    for (let i = 1; i < interpolated.points.length; i++) {
+                        maskCtx.lineTo(interpolated.points[i].x, interpolated.points[i].y);
+                    }
+                    maskCtx.closePath();
+                    maskCtx.fill();
+                    maskCtx.restore();
+                }
+            });
+            
+            maskCtx.globalCompositeOperation = 'source-over';
+            
+            // Draw outlines for all shapes if outlines are enabled
+            if (showOutlines) {
+                shapes.forEach(shape => {
+                    const interpolated = interpolateShape(shape, currentFrame);
+                    const isSelected = selectedShapes.includes(shape);
+                    
+                    maskCtx.globalAlpha = 1;
+                    maskCtx.strokeStyle = isSelected ? '#4a9eff' : 'rgba(255, 255, 255, 0.5)';
+                    maskCtx.lineWidth = isSelected ? 2 : 1;
+                    
+                    if (interpolated.type === 'circle') {
+                        maskCtx.save();
+                        maskCtx.translate(interpolated.x, interpolated.y);
+                        if (interpolated.rotation) {
+                            maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                        }
+                        maskCtx.beginPath();
+                        maskCtx.arc(0, 0, interpolated.radius, 0, Math.PI * 2);
+                        maskCtx.stroke();
+                        maskCtx.restore();
+                    } else if (interpolated.type === 'rectangle') {
+                        maskCtx.save();
+                        maskCtx.translate(interpolated.x, interpolated.y);
+                        if (interpolated.rotation) {
+                            maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                        }
+                        maskCtx.strokeRect(
+                            -interpolated.width/2,
+                            -interpolated.height/2,
+                            interpolated.width,
+                            interpolated.height
+                        );
+                        maskCtx.restore();
+                    } else if (interpolated.type === 'bezier' && interpolated.points) {
+                        const centroidX = interpolated.points.reduce((sum, p) => sum + p.x, 0) / interpolated.points.length;
+                        const centroidY = interpolated.points.reduce((sum, p) => sum + p.y, 0) / interpolated.points.length;
+                        
+                        maskCtx.save();
+                        maskCtx.translate(centroidX, centroidY);
+                        if (interpolated.rotation) {
+                            maskCtx.rotate(interpolated.rotation * Math.PI / 180);
+                        }
+                        maskCtx.translate(-centroidX, -centroidY);
+                        
+                        maskCtx.beginPath();
+                        maskCtx.moveTo(interpolated.points[0].x, interpolated.points[0].y);
+                        for (let i = 1; i < interpolated.points.length; i++) {
+                            maskCtx.lineTo(interpolated.points[i].x, interpolated.points[i].y);
+                        }
+                        maskCtx.closePath();
+                        maskCtx.stroke();
+                        maskCtx.restore();
+                    }
+                    
+                    // Draw handles only for selected shape
+                    if (shape === selectedShape) {
+                        if (interpolated.type === 'circle') {
+                            drawHandle(interpolated.x, interpolated.y - interpolated.radius);
+                            drawHandle(interpolated.x, interpolated.y + interpolated.radius);
+                            drawHandle(interpolated.x + interpolated.radius, interpolated.y);
+                            drawHandle(interpolated.x - interpolated.radius, interpolated.y);
+                        } else if (interpolated.type === 'rectangle') {
+                            drawHandle(interpolated.x - interpolated.width/2, interpolated.y - interpolated.height/2);
+                            drawHandle(interpolated.x + interpolated.width/2, interpolated.y - interpolated.height/2);
+                            drawHandle(interpolated.x - interpolated.width/2, interpolated.y + interpolated.height/2);
+                            drawHandle(interpolated.x + interpolated.width/2, interpolated.y + interpolated.height/2);
+                        } else if (interpolated.type === 'bezier' && interpolated.points) {
+                            interpolated.points.forEach((pt, i) => {
+                                const isSelected = selectedHandle && selectedHandle.name === 'point' && selectedHandle.index === i;
+                                drawHandle(pt.x, pt.y, isSelected);
+                            });
+                        }
+                    }
+                });
+            }
+            
+            if (isBoxSelecting && boxSelectStart && event) {
+                const rect = maskCanvas.getBoundingClientRect();
+                const currentX = (event.clientX - rect.left) / scale;
+                const currentY = (event.clientY - rect.top) / scale;
+                
+                maskCtx.strokeStyle = '#4a9eff';
+                maskCtx.fillStyle = 'rgba(74, 158, 255, 0.1)';
+                maskCtx.lineWidth = 2;
+                maskCtx.setLineDash([5, 5]);
+                maskCtx.fillRect(boxSelectStart.x, boxSelectStart.y, currentX - boxSelectStart.x, currentY - boxSelectStart.y);
+                maskCtx.strokeRect(boxSelectStart.x, boxSelectStart.y, currentX - boxSelectStart.x, currentY - boxSelectStart.y);
+                maskCtx.setLineDash([]);
+            }
+            
+            if (isDrawingBezier && bezierPoints.length > 0) {
+                maskCtx.globalAlpha = 1;
+                maskCtx.strokeStyle = '#ffaa00';
+                maskCtx.lineWidth = 2;
+                maskCtx.beginPath();
+                maskCtx.moveTo(bezierPoints[0].x, bezierPoints[0].y);
+                for (let i = 1; i < bezierPoints.length; i++) {
+                    maskCtx.lineTo(bezierPoints[i].x, bezierPoints[i].y);
+                }
+                maskCtx.stroke();
+                
+                bezierPoints.forEach(pt => {
+                    maskCtx.fillStyle = '#ffaa00';
+                    maskCtx.fillRect(pt.x - 4, pt.y - 4, 8, 8);
+                });
+            }
+            
+            maskCtx.globalAlpha = 1;
+        }
+        
+        function drawHandle(x, y, isSelected = false) {
+            const size = isSelected ? 6 : 4;
+            maskCtx.fillStyle = isSelected ? '#ff4444' : '#4a9eff';
+            maskCtx.strokeStyle = '#ffffff';
+            maskCtx.lineWidth = 2;
+            maskCtx.fillRect(x - size, y - size, size * 2, size * 2);
+            maskCtx.strokeRect(x - size, y - size, size * 2, size * 2);
+        }
+        
+        function interpolateShape(shape, frame) {
+            if (shape.keyframes.length === 0) return shape;
+            
+            const before = shape.keyframes.filter(kf => kf.frame <= frame).pop();
+            const after = shape.keyframes.find(kf => kf.frame > frame);
+            
+            if (!before && !after) return shape;
+            if (before && !after) return { ...shape, ...before.props };
+            if (!before && after) return { ...shape, ...after.props };
+            
+            const t = (frame - before.frame) / (after.frame - before.frame);
+            const lerp = (a, b) => a + (b - a) * t;
+            
+            const result = {
+                ...shape,
+                x: lerp(before.props.x, after.props.x),
+                y: lerp(before.props.y, after.props.y),
+                opacity: lerp(before.props.opacity, after.props.opacity),
+                rotation: lerp(before.props.rotation || shape.rotation || 0, after.props.rotation || shape.rotation || 0)
+            };
+            
+            if (shape.type === 'circle') {
+                result.radius = lerp(before.props.radius || shape.radius, after.props.radius || shape.radius);
+            } else if (shape.type === 'rectangle') {
+                result.width = lerp(before.props.width || shape.width, after.props.width || shape.width);
+                result.height = lerp(before.props.height || shape.height, after.props.height || shape.height);
+            } else if (shape.type === 'bezier') {
+                if (before.props.points && after.props.points && before.props.points.length === after.props.points.length) {
+                    result.points = before.props.points.map((pt, i) => ({
+                        x: lerp(pt.x, after.props.points[i].x),
+                        y: lerp(pt.y, after.props.points[i].y)
+                    }));
+                } else {
+                    result.points = before.props.points || after.props.points || shape.points;
+                }
+            }
+            
+            return result;
+        }
+        
+        function addKeyframeForShape(shape, frame) {
+            const kf = {
+                frame: frame,
+                props: {
+                    x: shape.x,
+                    y: shape.y,
+                    opacity: shape.opacity,
+                    rotation: shape.rotation || 0
+                }
+            };
+            
+            if (shape.type === 'circle') {
+                kf.props.radius = shape.radius;
+            } else if (shape.type === 'rectangle') {
+                kf.props.width = shape.width;
+                kf.props.height = shape.height;
+            } else if (shape.type === 'bezier') {
+                kf.props.points = shape.points ? [...shape.points] : [];
+            }
+            
+            shape.keyframes = shape.keyframes.filter(k => k.frame !== frame);
+            shape.keyframes.push(kf);
+            shape.keyframes.sort((a, b) => a.frame - b.frame);
+        }
+        
+        function updateShapeKeyframe(shape, frame, updates) {
+            let kf = shape.keyframes.find(k => k.frame === frame);
+            
+            if (!kf) {
+                const current = interpolateShape(shape, frame);
+                kf = {
+                    frame: frame,
+                    props: {
+                        x: current.x,
+                        y: current.y,
+                        opacity: current.opacity,
+                        rotation: current.rotation || 0
+                    }
+                };
+                
+                if (shape.type === 'circle') {
+                    kf.props.radius = current.radius;
+                } else if (shape.type === 'rectangle') {
+                    kf.props.width = current.width;
+                    kf.props.height = current.height;
+                } else if (shape.type === 'bezier') {
+                    kf.props.points = current.points ? [...current.points] : [];
+                }
+                
+                shape.keyframes.push(kf);
+                shape.keyframes.sort((a, b) => a.frame - b.frame);
+            }
+            
+            Object.assign(kf.props, updates);
+        }
+        
+        function addOpacityKeyframe() {
+            if (!selectedShape) {
+                alert('Please select a shape first');
+                return;
+            }
+            
+            const opacity = parseInt(document.getElementById('opacity').value) / 100;
+            updateShapeKeyframe(selectedShape, currentFrame, { opacity });
+            updateKeyframeTracks();
+            hasUnsavedChanges = true;
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Keyframe Added!';
+            btn.style.background = '#44ff44';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1000);
+        }
+        
+        function addRotationKeyframe() {
+            if (!selectedShape) {
+                alert('Please select a shape first');
+                return;
+            }
+            
+            const rotation = parseFloat(document.getElementById('rotation').value);
+            updateShapeKeyframe(selectedShape, currentFrame, { rotation });
+            updateKeyframeTracks();
+            hasUnsavedChanges = true;
+            
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = '✓ Keyframe Added!';
+            btn.style.background = '#44ff44';
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.background = '';
+            }, 1000);
+        }
+        
+        function deleteBezierPoint(shape, pointIndex) {
+            const interpolated = interpolateShape(shape, currentFrame);
+            
+            if (!interpolated.points || interpolated.points.length <= 3) {
+                alert('Bezier shapes need at least 3 points.');
+                return;
+            }
+            
+            const newPoints = interpolated.points.filter((_, i) => i !== pointIndex);
+            updateShapeKeyframe(shape, currentFrame, { points: newPoints });
+            
+            selectedHandle = null;
+            isDraggingHandle = false;
+            
+            hasUnsavedChanges = true;
+            render();
+            updateKeyframeTracks();
+        }
+        
+        // Undo system
+        function saveState() {
+            // Deep clone the shapes array
+            const state = JSON.parse(JSON.stringify(shapes));
+            
+            // Remove future states if we're not at the end
+            if (undoIndex < undoHistory.length - 1) {
+                undoHistory = undoHistory.slice(0, undoIndex + 1);
+            }
+            
+            undoHistory.push(state);
+            
+            // Limit history size
+            if (undoHistory.length > MAX_UNDO_HISTORY) {
+                undoHistory.shift();
+            } else {
+                undoIndex++;
+            }
+        }
+        
+        function undo() {
+            if (undoIndex > 0) {
+                undoIndex--;
+                shapes = JSON.parse(JSON.stringify(undoHistory[undoIndex]));
+                
+                // Clear selection if it doesn't exist anymore
+                if (selectedShape && !shapes.find(s => s.id === selectedShape.id)) {
+                    selectedShape = null;
+                    selectedShapes = [];
+                }
+                
+                updateShapeList();
+                render();
+                updateKeyframeTracks();
+                hasUnsavedChanges = true;
+                
+                showStatus('⎌ Undo', 'success');
+                setTimeout(() => document.getElementById('status').className = 'status', 1000);
+            }
+        }
+        
+        function deleteShapeById(id) {
+            saveState();
+            shapes = shapes.filter(s => s.id !== id);
+            if (selectedShape?.id === id) {
+                selectedShape = null;
+                selectedHandle = null;
+            }
+            selectedShapes = selectedShapes.filter(s => s.id !== id);
+            updateShapeList();
+            render();
+            hasUnsavedChanges = true;
+        }
+        
+        function selectShape(id) {
+            selectedShape = shapes.find(s => s.id === id);
+            selectedShapes = selectedShape ? [selectedShape] : [];
+            
+            if (selectedShape) {
+                const interpolated = interpolateShape(selectedShape, currentFrame);
+                if (selectedShape.type !== 'bezier') {
+                    document.getElementById('size').value = interpolated.radius || interpolated.width / 2;
+                    document.getElementById('sizeValue').textContent = interpolated.radius || interpolated.width / 2;
+                }
+                document.getElementById('opacity').value = Math.round(interpolated.opacity * 100);
+                document.getElementById('opacityValue').textContent = Math.round(interpolated.opacity * 100);
+                document.getElementById('rotation').value = Math.round(interpolated.rotation || 0);
+                document.getElementById('rotationValue').textContent = Math.round(interpolated.rotation || 0);
+                document.getElementById('stencilMode').value = selectedShape.stencilMode || 'add';
+            }
+            
+            updateShapeList();
+            render();
+        }
+        
+        function updateShapeList() {
+            const list = document.getElementById('shapeList');
+            list.innerHTML = shapes.map((s, index) => {
+                const shapeName = s.name || s.type;
+                const stencilIcon = s.stencilMode === 'subtract' ? '−' : 
+                                   s.stencilMode === 'intersect' ? '∩' :
+                                   s.stencilMode === 'difference' ? '⊕' : '+';
+                return `
+                <div class="shape-item ${s === selectedShape ? 'selected' : ''}" onclick="selectShape(${s.id})">
+                    <div style="flex: 1; min-width: 0;">
+                        <input type="text" 
+                               class="shape-name-input"
+                               value="${shapeName}" 
+                               onclick="event.stopPropagation()"
+                               onchange="renameShape(${s.id}, this.value)">
+                        <div style="font-size: 10px; color: #888; margin-top: 2px;">${s.keyframes.length} KF | ${stencilIcon} ${s.stencilMode || 'add'}</div>
+                    </div>
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <button class="layer-btn" onclick="moveShapeUp(event, ${index})" ${index === 0 ? 'disabled' : ''}>↑</button>
+                        <button class="layer-btn" onclick="moveShapeDown(event, ${index})" ${index === shapes.length - 1 ? 'disabled' : ''}>↓</button>
+                        <button class="delete-btn" onclick="deleteShapeById(${s.id}); event.stopPropagation();">×</button>
+                    </div>
+                </div>
+            `}).join('');
+        }
+        
+        function renameShape(id, newName) {
+            const shape = shapes.find(s => s.id === id);
+            if (shape) {
+                shape.name = newName.trim() || null;
+                hasUnsavedChanges = true;
+                updateShapeList();
+            }
+        }
+        
+        function moveShapeUp(e, index) {
+            e.stopPropagation();
+            if (index > 0) {
+                const temp = shapes[index - 1];
+                shapes[index - 1] = shapes[index];
+                shapes[index] = temp;
+                updateShapeList();
+                render();
+                hasUnsavedChanges = true;
+            }
+        }
+        
+        function moveShapeDown(e, index) {
+            e.stopPropagation();
+            if (index < shapes.length - 1) {
+                const temp = shapes[index];
+                shapes[index] = shapes[index + 1];
+                shapes[index + 1] = temp;
+                updateShapeList();
+                render();
+                hasUnsavedChanges = true;
+            }
+        }
+        
+        function updateKeyframeTracks() {
+            const container = document.getElementById('keyframeTracks');
+            
+            // Collect all keyframes from all shapes
+            const allKeyframes = [];
+            shapes.forEach(shape => {
+                shape.keyframes.forEach(kf => {
+                    allKeyframes.push({
+                        frame: kf.frame,
+                        shape: shape,
+                        props: kf.props
+                    });
+                });
+            });
+            
+            // Sort by frame
+            allKeyframes.sort((a, b) => a.frame - b.frame);
+            
+            // Group keyframes by frame
+            const frameGroups = {};
+            allKeyframes.forEach(kf => {
+                if (!frameGroups[kf.frame]) {
+                    frameGroups[kf.frame] = [];
+                }
+                frameGroups[kf.frame].push(kf);
+            });
+            
+            // Create unified timeline
+            container.innerHTML = `
+                <div class="keyframe-track">
+                    <div style="font-size: 13px; margin-bottom: 8px; font-weight: bold;">All Keyframes (${Object.keys(frameGroups).length} frames)</div>
+                    <div class="keyframe-bar" onclick="seekToFrame(event, this)" style="height: 40px; position: relative;">
+                        ${Object.entries(frameGroups).map(([frame, kfs]) => {
+                            const frameNum = parseInt(frame);
+                            const shapeNames = [...new Set(kfs.map(kf => kf.shape.name || kf.shape.type))].join(', ');
+                            const color = '#4a9eff';
+                            return `
+                            <div class="keyframe-marker" 
+                                 style="left: ${(frameNum / (totalFrames - 1)) * 100}%; background: ${color}; height: 100%;"
+                                 title="Frame ${frameNum}: ${shapeNames} (${kfs.length} shapes)"></div>
+                        `}).join('')}
+                        <div class="playhead" style="left: ${(currentFrame / (totalFrames - 1)) * 100}%; height: 100%;"></div>
+                    </div>
+                    <div style="font-size: 10px; color: #aaa; margin-top: 5px;">
+                        Click timeline to seek • Keyframes: ${allKeyframes.length} total
+                    </div>
+                </div>
+                
+                ${shapes.map(shape => `
+                <div class="keyframe-track" style="margin-top: 10px; opacity: ${selectedShapes.includes(shape) ? 1 : 0.6};">
+                    <div style="font-size: 11px; margin-bottom: 5px; display: flex; align-items: center; gap: 8px;">
+                        <span style="color: ${selectedShapes.includes(shape) ? '#4a9eff' : '#888'};">
+                            ${shape.name || shape.type}
+                        </span>
+                        <span style="font-size: 10px; color: #666;">(${shape.keyframes.length} keyframes)</span>
+                    </div>
+                    <div class="keyframe-bar" onclick="seekToFrame(event, this)" style="height: 25px; position: relative;">
+                        ${shape.keyframes.map(kf => {
+                            const hasRotation = kf.props.rotation !== undefined && kf.props.rotation !== 0;
+                            
+                            // Check if this is an opacity-only keyframe
+                            let isOpacityOnly = false;
+                            if (shape.keyframes.length > 1) {
+                                const prevKf = shape.keyframes.find(k => k.frame < kf.frame);
+                                const nextKf = shape.keyframes.find(k => k.frame > kf.frame);
+                                const baseKf = prevKf || nextKf || shape.keyframes[0];
+                                
+                                if (baseKf && baseKf.frame !== kf.frame) {
+                                    const positionChanged = Math.abs(kf.props.x - baseKf.props.x) > 0.01 || 
+                                                          Math.abs(kf.props.y - baseKf.props.y) > 0.01;
+                                    const sizeChanged = shape.type === 'circle' ? 
+                                                       (kf.props.radius !== baseKf.props.radius) :
+                                                       (kf.props.width !== baseKf.props.width || kf.props.height !== baseKf.props.height);
+                                    const rotationChanged = (kf.props.rotation || 0) !== (baseKf.props.rotation || 0);
+                                    
+                                    isOpacityOnly = !positionChanged && !sizeChanged && !rotationChanged;
+                                }
+                            }
+                            
+                            const color = isOpacityOnly ? '#ff9944' : '#4a9eff';
+                            const opacityClass = isOpacityOnly ? 'opacity-only' : '';
+                            const title = `Frame ${kf.frame}${hasRotation ? ` (Rotation: ${kf.props.rotation.toFixed(1)}°)` : ''}${isOpacityOnly ? ' (Opacity Only)' : ''}`;
+                            return `
+                            <div class="keyframe-marker ${opacityClass}" 
+                                 style="left: ${(kf.frame / (totalFrames - 1)) * 100}%; background: ${color}; height: 100%;"
+                                 onclick="deleteKeyframe(event, ${shape.id}, ${kf.frame})"
+                                 title="${title} - Click to delete"></div>
+                        `}).join('')}
+                        <div class="playhead" style="left: ${(currentFrame / (totalFrames - 1)) * 100}%; height: 100%;"></div>
+                    </div>
+                </div>
+                `).join('')}
+            `;
+        }
+        
+        function seekToFrame(e, element) {
+            if (e.target.classList.contains('keyframe-marker')) return;
+            
+            const rect = element.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const percent = x / rect.width;
+            currentFrame = Math.round(percent * (totalFrames - 1));
+            document.getElementById('currentFrame').textContent = currentFrame;
+            document.getElementById('frameSlider').value = currentFrame;
+            loadVideoFrame(currentFrame);
+            render();
+            updateKeyframeTracks();
+        }
+        
+        function deleteKeyframe(e, shapeId, frame) {
+            e.stopPropagation();
+            const shape = shapes.find(s => s.id === shapeId);
+            if (shape && shape.keyframes.length > 1) {
+                shape.keyframes = shape.keyframes.filter(kf => kf.frame !== frame);
+                updateKeyframeTracks();
+                render();
+                hasUnsavedChanges = true;
+            }
+        }
+        
+        function togglePlayback() {
+            isPlaying = !isPlaying;
+            document.querySelector('.play-btn').textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+            
+            if (isPlaying) {
+                playFrame();
+            }
+        }
+        
+        async function playFrame() {
+            if (!isPlaying) return;
+            
+            currentFrame = (currentFrame + 1) % totalFrames;
+            document.getElementById('currentFrame').textContent = currentFrame;
+            document.getElementById('frameSlider').value = currentFrame;
+            await loadVideoFrame(currentFrame);
+            render();
+            updateKeyframeTracks();
+            
+            setTimeout(playFrame, 1000 / 30);
+        }
+        
+        async function saveToComfyUI() {
+            const data = {
+                shapes: shapes.map(s => {
+                    const baseShape = {
+                        id: s.id,
+                        type: s.type,
+                        name: s.name,
+                        opacity: s.opacity,
+                        stencilMode: s.stencilMode
+                    };
+                    
+                    if (s.type === 'bezier') {
+                        baseShape.points = s.points.map(p => ({
+                            x: p.x / videoWidth,
+                            y: p.y / videoHeight
+                        }));
+                        baseShape.x = s.points[0].x / videoWidth;
+                        baseShape.y = s.points[0].y / videoHeight;
+                    } else {
+                        baseShape.x = s.x / videoWidth;
+                        baseShape.y = s.y / videoHeight;
+                        if (s.type === 'circle') {
+                            baseShape.radius = s.radius;
+                        } else if (s.type === 'rectangle') {
+                            baseShape.width = s.width;
+                            baseShape.height = s.height;
+                        }
+                    }
+                    
+                    return baseShape;
+                }),
+                keyframes: {},
+                totalFrames: totalFrames
+            };
+            
+            shapes.forEach(shape => {
+                if (shape.keyframes.length > 0) {
+                    data.keyframes[shape.id] = shape.keyframes.map(kf => {
+                        const props = {
+                            opacity: kf.props.opacity
+                        };
+                        
+                        if (shape.type === 'bezier') {
+                            if (kf.props.points) {
+                                props.points = kf.props.points.map(p => ({
+                                    x: p.x / videoWidth,
+                                    y: p.y / videoHeight
+                                }));
+                            }
+                            props.x = kf.props.x / videoWidth;
+                            props.y = kf.props.y / videoHeight;
+                        } else {
+                            props.x = kf.props.x / videoWidth;
+                            props.y = kf.props.y / videoHeight;
+                            
+                            if (shape.type === 'circle') {
+                                props.radius = kf.props.radius;
+                            } else if (shape.type === 'rectangle') {
+                                props.width = kf.props.width;
+                                props.height = kf.props.height;
+                            }
+                        }
+                        
+                        return {
+                            frame: kf.frame,
+                            properties: props
+                        };
+                    });
+                }
+            });
+            
+            try {
+                const payload = JSON.stringify(data);
+                const response = await fetch('/animated_mask_editor/save' + nodeQuery, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Hand the shapes back to the ComfyUI graph so they're stored
+                    // in the node's hidden widget and serialized into the workflow.
+                    if (nodeId !== null) {
+                        try {
+                            const channel = new BroadcastChannel("roto_mask_editor");
+                            channel.postMessage({ node: nodeId, data: payload });
+                            channel.close();
+                        } catch (err) {
+                            console.warn('Could not notify ComfyUI graph:', err);
+                        }
+                    }
+
+                    showStatus('✓ Saved! Shapes stored in the node.', 'success');
+                    hasUnsavedChanges = false;
+
+                    setTimeout(() => {
+                        window.close();
+                    }, 2000);
+                } else {
+                    showStatus('✗ Save failed', 'error');
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                showStatus('✗ Connection error', 'error');
+            }
+        }
+        
+        async function loadFromComfyUI() {
+            try {
+                const response = await fetch('/animated_mask_editor/load' + nodeQuery);
+                const data = await response.json();
+                
+                if (data.shapes && data.shapes.length > 0) {
+                    shapes = data.shapes.map(s => {
+                        const shape = {
+                            id: s.id,
+                            type: s.type,
+                            name: s.name,
+                            opacity: s.opacity,
+                            stencilMode: s.stencilMode || 'add',
+                            keyframes: []
+                        };
+                        
+                        if (s.type === 'bezier') {
+                            shape.points = s.points.map(p => ({
+                                x: p.x * videoWidth,
+                                y: p.y * videoHeight
+                            }));
+                            shape.x = s.points[0].x * videoWidth;
+                            shape.y = s.points[0].y * videoHeight;
+                        } else {
+                            shape.x = s.x * videoWidth;
+                            shape.y = s.y * videoHeight;
+                            if (s.type === 'circle') {
+                                shape.radius = s.radius;
+                            } else if (s.type === 'rectangle') {
+                                shape.width = s.width;
+                                shape.height = s.height;
+                            }
+                        }
+                        
+                        return shape;
+                    });
+                    
+                    if (data.keyframes) {
+                        shapes.forEach(shape => {
+                            const kfData = data.keyframes[shape.id];
+                            if (kfData) {
+                                shape.keyframes = kfData.map(kf => {
+                                    const props = {
+                                        opacity: kf.properties.opacity
+                                    };
+                                    
+                                    if (shape.type === 'bezier') {
+                                        if (kf.properties.points) {
+                                            props.points = kf.properties.points.map(p => ({
+                                                x: p.x * videoWidth,
+                                                y: p.y * videoHeight
+                                            }));
+                                        }
+                                        props.x = kf.properties.x * videoWidth;
+                                        props.y = kf.properties.y * videoHeight;
+                                    } else {
+                                        props.x = kf.properties.x * videoWidth;
+                                        props.y = kf.properties.y * videoHeight;
+                                        
+                                        if (shape.type === 'circle') {
+                                            props.radius = kf.properties.radius;
+                                        } else if (shape.type === 'rectangle') {
+                                            props.width = kf.properties.width;
+                                            props.height = kf.properties.height;
+                                        }
+                                    }
+                                    
+                                    // Load rotation if present
+                                    if (kf.properties.rotation !== undefined) {
+                                        props.rotation = kf.properties.rotation;
+                                    }
+                                    
+                                    return {
+                                        frame: kf.frame,
+                                        props: props
+                                    };
+                                });
+                            }
+                        });
+                    }
+                    
+                    updateShapeList();
+                    updateKeyframeTracks();
+                    render();
+                    
+                    // Save initial state for undo
+                    saveState();
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+            }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            
+            if (type !== 'success') {
+                setTimeout(() => {
+                    status.className = 'status';
+                }, 3000);
+            }
+        }
+        
+        function toggleOutlines() {
+            showOutlines = !showOutlines;
+            const btn = document.getElementById('toggleOutlinesBtn');
+            btn.textContent = showOutlines ? '👁️ Hide Outlines' : '👁️ Show Outlines';
+            btn.classList.toggle('active', showOutlines);
+            render();
+        }
+        
+        // Nuke Import Functions
+        function showImportDialog() {
+            document.getElementById('importModal').classList.add('active');
+            document.getElementById('importTextarea').value = '';
+            document.getElementById('importStatus').textContent = '';
+        }
+        
+        function closeImportDialog() {
+            document.getElementById('importModal').classList.remove('active');
+        }
+        
+        function processNukeImport() {
+            const textarea = document.getElementById('importTextarea');
+            const statusEl = document.getElementById('importStatus');
+            const text = textarea.value.trim();
+            
+            if (!text) {
+                statusEl.textContent = 'Please paste Nuke roto data';
+                return;
+            }
+            
+            try {
+                saveState(); // Save for undo
+                
+                const imported = parseNukeRoto(text);
+                
+                if (!imported || imported.length === 0) {
+                    statusEl.textContent = 'No valid shapes found in imported data';
+                    return;
+                }
+                
+                // Add imported shapes
+                imported.forEach(shape => {
+                    shapes.push(shape);
+                });
+                
+                updateShapeList();
+                updateKeyframeTracks();
+                render();
+                hasUnsavedChanges = true;
+                
+                closeImportDialog();
+                showStatus(`✓ Imported ${imported.length} shape(s) from Nuke`, 'success');
+            } catch (error) {
+                console.error('Import error:', error);
+                statusEl.textContent = `Error: ${error.message}`;
+            }
+        }
+        
+        function parseNukeRoto(text) {
+            const shapes = [];
+            
+            // Try to detect format: JSON, Python dict, or Nuke TCL
+            let data;
+            
+            // Try JSON first
+            try {
+                data = JSON.parse(text);
+            } catch (e) {
+                // Try Python dict format
+                try {
+                    // Convert Python dict syntax to JSON
+                    let jsonText = text
+                        .replace(/'/g, '"')
+                        .replace(/True/g, 'true')
+                        .replace(/False/g, 'false')
+                        .replace(/None/g, 'null');
+                    data = JSON.parse(jsonText);
+                } catch (e2) {
+                    // Try to parse Nuke TCL/script format
+                    data = parseNukeTCL(text);
+                }
+            }
+            
+            if (!data) {
+                throw new Error('Could not parse data format');
+            }
+            
+            // Process curves/shapes
+            const curves = data.curves || data.shapes || [];
+            
+            curves.forEach((curve, index) => {
+                const shape = convertNukeCurveToShape(curve, index);
+                if (shape) {
+                    shapes.push(shape);
+                }
+            });
+            
+            return shapes;
+        }
+        
+        function parseNukeTCL(text) {
+            // Basic parser for Nuke's TCL format
+            // This is a simplified version - real Nuke format is complex
+            const curves = [];
+            
+            // Look for Bezier or Roto node patterns
+            const bezierRegex = /Bezier\d*\s*\{([^}]+)\}/g;
+            let match;
+            
+            while ((match = bezierRegex.exec(text)) !== null) {
+                const content = match[1];
+                const points = [];
+                
+                // Extract point data - format: {x y} {ctrlX ctrlY}
+                const pointRegex = /\{\s*(-?[\d.]+)\s+(-?[\d.]+)\s*\}/g;
+                let pointMatch;
+                
+                while ((pointMatch = pointRegex.exec(content)) !== null) {
+                    points.push({
+                        x: parseFloat(pointMatch[1]) / videoWidth,
+                        y: parseFloat(pointMatch[2]) / videoHeight
+                    });
+                }
+                
+                if (points.length >= 3) {
+                    curves.push({
+                        name: `Imported_Bezier_${curves.length + 1}`,
+                        points: points,
+                        lifetime: [0, totalFrames - 1]
+                    });
+                }
+            }
+            
+            return curves.length > 0 ? { curves } : null;
+        }
+        
+        function convertNukeCurveToShape(curve, index) {
+            // Convert Nuke curve to our shape format
+            const shapeId = Date.now() + index;
+            
+            // Get points - Nuke format varies
+            let points = curve.points || curve.vertices || [];
+            
+            // Normalize point format
+            points = points.map(p => {
+                if (Array.isArray(p)) {
+                    return { x: p[0], y: p[1] };
+                } else if (typeof p === 'object') {
+                    // Already in object format, normalize coordinates
+                    const x = (p.x !== undefined ? p.x : p.posX || 0);
+                    const y = (p.y !== undefined ? p.y : p.posY || 0);
+                    
+                    // Nuke coordinates are typically 0-1 normalized or absolute pixels
+                    // If values are > 2, assume pixel coordinates
+                    const normX = x > 2 ? x / videoWidth : x;
+                    const normY = y > 2 ? y / videoHeight : y;
+                    
+                    return {
+                        x: normX * videoWidth,
+                        y: normY * videoHeight
+                    };
+                }
+                return { x: 0.5 * videoWidth, y: 0.5 * videoHeight };
+            });
+            
+            if (points.length < 3) {
+                return null; // Need at least 3 points for a bezier
+            }
+            
+            const shape = {
+                id: shapeId,
+                type: 'bezier',
+                name: curve.name || `Imported_${index + 1}`,
+                points: points,
+                x: points[0].x,
+                y: points[0].y,
+                opacity: 1.0,
+                stencilMode: 'add',
+                keyframes: []
+            };
+            
+            // Convert Nuke animation keyframes if present
+            if (curve.animation || curve.keyframes) {
+                const nukeKeyframes = curve.animation || curve.keyframes;
+                
+                nukeKeyframes.forEach(kf => {
+                    const frame = kf.frame || kf.time || 0;
+                    const kfPoints = kf.points || kf.vertices || points;
+                    
+                    const normalizedPoints = kfPoints.map(p => {
+                        const x = (p.x !== undefined ? p.x : p.posX || 0);
+                        const y = (p.y !== undefined ? p.y : p.posY || 0);
+                        const normX = x > 2 ? x / videoWidth : x;
+                        const normY = y > 2 ? y / videoHeight : y;
+                        
+                        return {
+                            x: normX * videoWidth,
+                            y: normY * videoHeight
+                        };
+                    });
+                    
+                    shape.keyframes.push({
+                        frame: Math.min(frame, totalFrames - 1),
+                        props: {
+                            points: normalizedPoints,
+                            x: normalizedPoints[0].x,
+                            y: normalizedPoints[0].y,
+                            opacity: kf.opacity !== undefined ? kf.opacity : 1.0,
+                            rotation: kf.rotation || 0
+                        }
+                    });
+                });
+                
+                shape.keyframes.sort((a, b) => a.frame - b.frame);
+            } else {
+                // Create keyframe at frame 0
+                shape.keyframes.push({
+                    frame: 0,
+                    props: {
+                        points: points,
+                        x: points[0].x,
+                        y: points[0].y,
+                        opacity: 1.0,
+                        rotation: 0
+                    }
+                });
+            }
+            
+            return shape;
+        }
+        window.addEventListener('beforeunload', (e) => {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+        
+        console.log("=== MASK EDITOR V2.0 READY ===");
+    </script>
+</body>
+</html>
