@@ -104,10 +104,6 @@ class AnimatedMaskDrawer:
                     "default": "",
                     "tooltip": "Serialized roto shapes/keyframes (hidden - managed by the editor). Stored in the workflow so shapes survive restarts."
                 }),
-                "auto_resolution": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": "Automatically match the mask output to the input video's resolution. Turn off to set width/height manually."
-                }),
                 "width": ("INT", {
                     "default": 0,
                     "min": 0,
@@ -135,6 +131,13 @@ class AnimatedMaskDrawer:
                     "min": 0,
                     "max": 999999,
                     "tooltip": "Increment this value to force regeneration of masks"
+                }),
+                # NOTE: keep new widgets LAST. ComfyUI serializes widget values
+                # positionally, so inserting one mid-list shifts every saved
+                # value in existing workflows and breaks them.
+                "auto_resolution": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Automatically match the mask output to the input video's resolution. Turn off to set width/height manually."
                 }),
             },
             "hidden": {
@@ -182,6 +185,8 @@ class AnimatedMaskDrawer:
         # Resolve the output resolution. Auto-detect from the video by default;
         # otherwise honour the manual width/height (0, None, or legacy 512 fall
         # back to the video dimension so old workflows keep auto-detecting).
+        if auto_resolution is None:
+            auto_resolution = True
         if auto_resolution or not width or width == 512:
             width = video_width
         if auto_resolution or not height or height == 512:
