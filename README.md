@@ -17,6 +17,14 @@ Shapes are **persistent**: they serialize into your workflow (and a disk backup)
 
 ---
 
+## 🧩 The Node
+
+![Animated Mask Drawer node in ComfyUI](docs/screenshots/comfyui-node.png)
+
+*Drop in the node, connect a video/image batch to **video**, and hit **🎨 Launch Mask Editor**. It outputs the `mask_sequence` plus two preview overlays.*
+
+---
+
 ## 🖥️ The Editor
 
 ![Animated Mask Editor interface](docs/screenshots/editor-interface.png)
