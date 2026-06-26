@@ -104,17 +104,21 @@ class AnimatedMaskDrawer:
                     "default": "",
                     "tooltip": "Serialized roto shapes/keyframes (hidden - managed by the editor). Stored in the workflow so shapes survive restarts."
                 }),
+                "auto_resolution": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": "Automatically match the mask output to the input video's resolution. Turn off to set width/height manually."
+                }),
                 "width": ("INT", {
-                    "default": 512, 
-                    "min": 64, 
+                    "default": 0,
+                    "min": 0,
                     "max": 4096,
-                    "tooltip": "Output mask width (leave 512 to auto-detect from video)"
+                    "tooltip": "Manual output mask width. Only used when auto_resolution is off (0 = use video width)."
                 }),
                 "height": ("INT", {
-                    "default": 512, 
-                    "min": 64, 
+                    "default": 0,
+                    "min": 0,
                     "max": 4096,
-                    "tooltip": "Output mask height (leave 512 to auto-detect from video)"
+                    "tooltip": "Manual output mask height. Only used when auto_resolution is off (0 = use video height)."
                 }),
                 "feather": ("INT", {
                     "default": 0, 
@@ -149,8 +153,8 @@ class AnimatedMaskDrawer:
     CATEGORY = "mask/animation"
     OUTPUT_NODE = False
     
-    def generate_masks(self, video, width=None, height=None, feather=0, invert=False, refresh=0,
-                       mask_data="", unique_id=None):
+    def generate_masks(self, video, width=0, height=0, feather=0, invert=False, refresh=0,
+                       auto_resolution=True, mask_data="", unique_id=None):
         """
         Generate animated masks based on keyframe data
         """
@@ -175,10 +179,12 @@ class AnimatedMaskDrawer:
         batch_size = video.shape[0]
         video_height, video_width = video.shape[1], video.shape[2]
         
-        # Use video dimensions if width/height not specified or are default
-        if width is None or width == 512:
+        # Resolve the output resolution. Auto-detect from the video by default;
+        # otherwise honour the manual width/height (0, None, or legacy 512 fall
+        # back to the video dimension so old workflows keep auto-detecting).
+        if auto_resolution or not width or width == 512:
             width = video_width
-        if height is None or height == 512:
+        if auto_resolution or not height or height == 512:
             height = video_height
         
         masks = []
