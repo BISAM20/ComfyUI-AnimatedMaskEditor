@@ -683,6 +683,14 @@
             return value <= 1 ? value * dim : value;
         }
 
+        // Programmatically select a tool and sync the toolbar's active button.
+        function setActiveTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn[data-tool]').forEach(b => {
+                b.classList.toggle('active', b.dataset.tool === tool);
+            });
+        }
+
         // Undo system
         let undoHistory = [];
         let undoIndex = -1;
@@ -1122,8 +1130,12 @@
                 saveState();
                 updateShapeList();
                 hasUnsavedChanges = true;
+
+                // After drawing, switch to Select/Move so the new shape can be
+                // adjusted immediately without re-creating shapes on every click.
+                setActiveTool('select');
             }
-            
+
             render();
         }
         
@@ -1364,9 +1376,16 @@
             selectedShape = shape;
             selectedShapes = [shape];
             saveState();
-            
+
             bezierPoints = [];
             isDrawingBezier = false;
+
+            // Finished drawing — switch to Select/Move for immediate editing.
+            // Skip if finishBezier was triggered by the user picking another
+            // tool (currentTool already changed); only auto-switch on Enter.
+            if (currentTool === 'bezier') {
+                setActiveTool('select');
+            }
             
             updateShapeList();
             hasUnsavedChanges = true;
