@@ -66,6 +66,18 @@ def save_backup(node_key, data):
         json.dump(data, f, indent=2)
 
 
+def resolve_size(value, dim, default):
+    """Resolve a shape size (radius/width/height) to output pixels.
+
+    Sizes are stored normalized (0-1, a fraction of the frame) so masks render
+    at the correct size for ANY output resolution. Legacy data stored absolute
+    pixels (> 1); those are passed through unchanged for backward compatibility.
+    """
+    if value is None:
+        value = default
+    return value * dim if value <= 1.0 else value
+
+
 class AnimatedMaskDrawer:
     """
     ComfyUI Custom Node for drawing animated masks with keyframes
@@ -301,13 +313,14 @@ class AnimatedMaskDrawer:
         rotation = shape.get("rotation", 0)
         
         if shape_type == "circle":
+            # Radius is stored normalized (fraction of width); scale to output px.
+            radius = resolve_size(shape.get("radius"), img_width, 50)
             # Create a temporary image for rotation
             if rotation != 0:
-                radius = shape.get("radius", 50)
                 size = int(radius * 2.5)
                 temp_img = Image.new('L', (size, size), 0)
                 temp_draw = ImageDraw.Draw(temp_img)
-                temp_draw.ellipse([size//2 - radius, size//2 - radius, 
+                temp_draw.ellipse([size//2 - radius, size//2 - radius,
                                   size//2 + radius, size//2 + radius], fill=opacity)
                 temp_img = temp_img.rotate(rotation, expand=False)
                 # Paste the rotated image
@@ -315,13 +328,13 @@ class AnimatedMaskDrawer:
                 paste_y = int(y - size // 2)
                 draw._image.paste(temp_img, (paste_x, paste_y), temp_img)
             else:
-                radius = shape.get("radius", 50)
                 draw.ellipse([x - radius, y - radius, x + radius, y + radius], fill=opacity)
-        
+
         elif shape_type == "rectangle":
-            w = shape.get("width", 100)
-            h = shape.get("height", 100)
-            
+            # Width/height stored normalized (fraction of each dim); scale to px.
+            w = resolve_size(shape.get("width"), img_width, 100)
+            h = resolve_size(shape.get("height"), img_height, 100)
+
             if rotation != 0:
                 # Create temporary image for rotation
                 size = int(max(w, h) * 1.5)

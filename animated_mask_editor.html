@@ -673,7 +673,16 @@
         let videoFrameCache = {};
         let videoWidth = 0;
         let videoHeight = 0;
-        
+
+        // Shape sizes (radius/width/height) are saved normalized (0-1, fraction
+        // of the frame) so masks render at the right size for ANY output
+        // resolution. denormSize() converts a stored value back to editor pixels;
+        // legacy data saved absolute pixels (> 1) and is passed through as-is.
+        function denormSize(value, dim) {
+            if (value === undefined || value === null) return value;
+            return value <= 1 ? value * dim : value;
+        }
+
         // Undo system
         let undoHistory = [];
         let undoIndex = -1;
@@ -2006,10 +2015,10 @@
                         baseShape.x = s.x / videoWidth;
                         baseShape.y = s.y / videoHeight;
                         if (s.type === 'circle') {
-                            baseShape.radius = s.radius;
+                            baseShape.radius = s.radius / videoWidth;
                         } else if (s.type === 'rectangle') {
-                            baseShape.width = s.width;
-                            baseShape.height = s.height;
+                            baseShape.width = s.width / videoWidth;
+                            baseShape.height = s.height / videoHeight;
                         }
                     }
                     
@@ -2038,12 +2047,12 @@
                         } else {
                             props.x = kf.props.x / videoWidth;
                             props.y = kf.props.y / videoHeight;
-                            
+
                             if (shape.type === 'circle') {
-                                props.radius = kf.props.radius;
+                                props.radius = kf.props.radius / videoWidth;
                             } else if (shape.type === 'rectangle') {
-                                props.width = kf.props.width;
-                                props.height = kf.props.height;
+                                props.width = kf.props.width / videoWidth;
+                                props.height = kf.props.height / videoHeight;
                             }
                         }
                         
@@ -2120,10 +2129,10 @@
                             shape.x = s.x * videoWidth;
                             shape.y = s.y * videoHeight;
                             if (s.type === 'circle') {
-                                shape.radius = s.radius;
+                                shape.radius = denormSize(s.radius, videoWidth);
                             } else if (s.type === 'rectangle') {
-                                shape.width = s.width;
-                                shape.height = s.height;
+                                shape.width = denormSize(s.width, videoWidth);
+                                shape.height = denormSize(s.height, videoHeight);
                             }
                         }
                         
@@ -2153,10 +2162,10 @@
                                         props.y = kf.properties.y * videoHeight;
                                         
                                         if (shape.type === 'circle') {
-                                            props.radius = kf.properties.radius;
+                                            props.radius = denormSize(kf.properties.radius, videoWidth);
                                         } else if (shape.type === 'rectangle') {
-                                            props.width = kf.properties.width;
-                                            props.height = kf.properties.height;
+                                            props.width = denormSize(kf.properties.width, videoWidth);
+                                            props.height = denormSize(kf.properties.height, videoHeight);
                                         }
                                     }
                                     
