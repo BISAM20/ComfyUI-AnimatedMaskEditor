@@ -4,8 +4,6 @@ A ComfyUI custom node for drawing **animated, keyframed masks** directly on your
 
 Shapes are **persistent**: they serialize into your workflow (and a disk backup), so your roto survives restarts and travels with the `.json`.
 
-> Bonus: import shapes straight from a **Nuke Roto** node via copy-paste or a small Python snippet.
-
 ---
 
 ## ✨ Features
@@ -15,7 +13,6 @@ Shapes are **persistent**: they serialize into your workflow (and a disk backup)
 - 🟦🟧 **Readable timeline** — position/size/rotation keyframes are **blue**, opacity-only keyframes are **orange**.
 - 🌫️ **Feathering & invert** — soft edges and one-click mask inversion.
 - 💾 **Persistent masks** — stored in the workflow + a per-node disk backup, so nothing is lost on restart.
-- 📋 **Nuke Roto import** — paste a Nuke roto node (Ctrl+V) or import via a Python snippet.
 - 🔌 **Three outputs** — the mask sequence plus two ready-to-view preview overlays.
 
 ---
@@ -75,18 +72,7 @@ After restarting, the node appears under **Add Node → mask → animation → `
 | **Delete** | Delete selected shape / keyframe |
 | **Enter** | Finish bézier path |
 | **Esc** | Cancel current bézier |
-| **Ctrl+V** | Paste Nuke roto data (opens import dialog) |
 | Scroll wheel | Zoom · Middle-drag (or Shift+drag) | Pan · ⊙ | Fit & center |
-
----
-
-## 📋 Importing from Nuke
-
-![Nuke Roto import dialog](docs/screenshots/nuke-import.png)
-
-**Fastest way:** select your Roto node in Nuke, **Ctrl+C**, then **Ctrl+V** inside the editor — the import dialog opens pre-filled. Click **✓ Import**.
-
-**Or** click **Import from Nuke**, paste the roto data (Python format, normalized `0–1` coordinates with a per-curve `lifetime`), and import. See [`NUKE_IMPORT_GUIDE.md`](NUKE_IMPORT_GUIDE.md) for the Python export snippet and details.
 
 ---
 
