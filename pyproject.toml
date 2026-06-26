@@ -1,0 +1,16 @@
+[project]
+name = "comfyui-animated-mask-editor"
+description = "Interactive editor for drawing animated, keyframed masks on a video/image batch in ComfyUI — circle, rectangle and bézier shapes with automatic keyframing, feathering and invert."
+version = "1.0.0"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "scipy",
+]
+
+[project.urls]
+Repository = "https://github.com/BISAM20/ComfyUI-AnimatedMaskEditor"
+
+[tool.comfy]
+PublisherId = "bisam20"
+DisplayName = "Animated Mask Editor"
