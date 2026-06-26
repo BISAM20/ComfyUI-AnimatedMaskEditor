@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-animated-mask-editor"
 description = "Interactive editor for drawing animated, keyframed masks on a video/image batch in ComfyUI — circle, rectangle and bézier shapes with automatic keyframing, feathering and invert."
-version = "1.0.2"
+version = "1.0.3"
 license = { file = "LICENSE" }
 requires-python = ">=3.9"
 dependencies = [
