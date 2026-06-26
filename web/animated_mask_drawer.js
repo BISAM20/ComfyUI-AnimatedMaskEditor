@@ -33,34 +33,7 @@ app.registerExtension({
                     openMaskEditor(this);
                 });
 
-                // Add status text
-                const statusWidget = this.addWidget("text", "status", "Ready", () => {}, {
-                    multiline: false
-                });
-                statusWidget.disabled = true;
-
-                // Store reference for updates
-                this.maskEditorStatus = statusWidget;
-
                 return r;
-            }
-            
-            // Override execution to show status
-            const onExecuted = nodeType.prototype.onExecuted;
-            nodeType.prototype.onExecuted = function(message) {
-                if (onExecuted) {
-                    onExecuted.apply(this, arguments);
-                }
-                
-                if (this.maskEditorStatus) {
-                    try {
-                        const maskData = message.mask_data_json ? JSON.parse(message.mask_data_json) : null;
-                        const shapeCount = maskData?.shapes?.length || 0;
-                        this.maskEditorStatus.value = `✔ Generated (${shapeCount} shapes)`;
-                    } catch (e) {
-                        this.maskEditorStatus.value = "✔ Masks generated";
-                    }
-                }
             }
         }
     }
@@ -77,12 +50,6 @@ maskEditorChannel.onmessage = (e) => {
     const graphNode = app.graph?.getNodeById?.(node);
     if (graphNode && graphNode.maskDataWidget) {
         graphNode.maskDataWidget.value = data;
-        if (graphNode.maskEditorStatus) {
-            try {
-                const shapeCount = JSON.parse(data)?.shapes?.length || 0;
-                graphNode.maskEditorStatus.value = `✔ ${shapeCount} shapes saved`;
-            } catch (_) { /* ignore */ }
-        }
         app.graph.setDirtyCanvas(true, true);
     }
 };

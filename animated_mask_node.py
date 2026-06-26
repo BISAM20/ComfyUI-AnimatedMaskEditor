@@ -126,12 +126,6 @@ class AnimatedMaskDrawer:
                     "default": False,
                     "tooltip": "Invert mask (swap masked/unmasked areas)"
                 }),
-                "refresh": ("INT", {
-                    "default": 0,
-                    "min": 0,
-                    "max": 999999,
-                    "tooltip": "Increment this value to force regeneration of masks"
-                }),
                 # NOTE: keep new widgets LAST. ComfyUI serializes widget values
                 # positionally, so inserting one mid-list shifts every saved
                 # value in existing workflows and breaks them.
@@ -156,8 +150,8 @@ class AnimatedMaskDrawer:
     CATEGORY = "mask/animation"
     OUTPUT_NODE = False
     
-    def generate_masks(self, video, width=0, height=0, feather=0, invert=False, refresh=0,
-                       auto_resolution=True, mask_data="", unique_id=None):
+    def generate_masks(self, video, width=0, height=0, feather=0, invert=False,
+                       auto_resolution=True, mask_data="", unique_id=None, **kwargs):
         """
         Generate animated masks based on keyframe data
         """
