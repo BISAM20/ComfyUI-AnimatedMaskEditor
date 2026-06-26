@@ -1,0 +1,3 @@
+# torch, numpy and Pillow ship with ComfyUI.
+# scipy is optional — it is only used for the `feather` (soft edge) feature.
+scipy

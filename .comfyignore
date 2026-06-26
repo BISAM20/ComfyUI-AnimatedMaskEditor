@@ -1,0 +1,5 @@
+# Files excluded from the published Comfy Registry package (gitignore syntax).
+__pycache__/
+*.pyc
+roto_data/
+files.zip
